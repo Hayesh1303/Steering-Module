@@ -70,29 +70,37 @@ Don't worry about the steering sensor input. Not sure what that even does.
 /**********************************************************/
 #define ENCODER_OPTIMIZE_INTERRUPTS
 #define motorTicksPerRotation 435.3 // Encoder ticks per rotation
+#define TOTAL_ROTATION 2            // Rotations from max left to max right
+#define TOTAL_ROTATION_TICKS (435.3 * TOTAL_ROTATION) // Max rotation ticks
+#define MIN_ROTATION (TOTAL_ROTATION / -2)
+#define MAX_ROTATION (TOTAL_ROTATION / 2)
+#define TOLERANCE 45
 
 /**********************************************************/
 /*                  Variable Definitions                  */
 /**********************************************************/
-long oldPosition = 0;
-long newPosition = 0;
-int motorPower;
-double rotation;
-float tolerance = 0.1; //FIND IDEAL VALUE
-float maximumSteeringWheelTurns = 2; //FIND IDEAL VALUE
-double minRotation = totalRotation / -maximumSteeringWheelTurns;
-double maxRotation = totalRotation / maximumSteeringWheelTurns;
-uint16_t outPosition;
+//CAN Variables
 struct canFrame frame;
 struct canFrame out;
 uint32_t target = 0x0CF00105;     //SET CAN VALUE
 byte messageOut[8] {0, 0, 0, 0, 0, 0, 0, 0};
 byte messageIn[8] {0, 0, 0, 0, 0, 0, 0, 0};
 
+//Steering Variables
+long oldPosition = 0;
+long newPosition = 0;
+long boundedPositiont = 0;
+int motorPower;
+double rotation;
+uint16_t steeringOut;
+
 /********************************************************/
 /*                  Object Definitions                  */
 /********************************************************/
+//CAN Object
 MCP2515 mcp2515(CS);
+
+//Motor Encoder Object
 Encoder motorEncoder(encoderB, encoderA);
 
 
@@ -101,18 +109,28 @@ Encoder motorEncoder(encoderB, encoderA);
 /******************************************/
 void setup() {
   Serial.begin(115200);
+
+//CAN Init
   mcp2515.reset();
   mcp2515.setBitrate(CAN_250KBPS, MCP_12MHZ);
   mcp2515.setNormalMode();
+
+//Steering Motor Pin Init
   pinMode(SteeringPWMp, OUTPUT);
   pinMode(SteeringPWMn, OUTPUT);
+
+//Tilt Motor Pin Init
   pinMode(TiltPWMp, OUTPUT);
   pinMode(TiltPWMn, OUTPUT);
+
+//Bullshit
   pinMode(currentSenseSteeringp, INPUT);
   pinMode(currentSenseSteeringn, INPUT);
   pinMode(currentSenseSteeringp, INPUT);
   pinMode(currentSenseSteeringp, INPUT);
   pinMode(sensorIn, INPUT);
+
+//MUX Pin Init
   pinMode(MUXa, OUTPUT);
   pinMode(MUXb, OUTPUT);
   pinMode(MUXc, OUTPUT);
@@ -122,50 +140,34 @@ void setup() {
 void loop()
 {
   //Read Encoder Position
-  new_position = motor1.read();
+  newPosition = motor1.read();
 
   //Check if position Changed
-  if (new_position != old_position)
+  if (newPosition != oldPosition)
   {
-    
+    //Set old position
+    oldPosition = newPosition;
+    boundedPosition = wheel_bound(newPosition);
+  
   }
 
   
 }
 
-
-void motorTest(bool motorA, bool motorB, double time = 10) 
+//This ensures the steering wheels rotation values stays within the working values of this code
+long wheel_bound(long wheelPosition) 
 {
-  // Test Routine for Testing Motors
- 
-  if (motorA || motorB) 
+  long temp_value;
+  if (wheelPosition > MAX_ROTATION + TOLERANCE) 
   {
-    for (int i = 0; i <= 255; i++) 
-    {
-      if (motorA) 
-      {
-        analogWrite(steeringPWMp, i);
-        analogWrite(steeringPWMn, 0);
-      }
-      if (motorB) 
-      {
-        analogWrite(tiltPWMp, i);
-        analogWrite(tiltPWMn, 0);
-      }
-      delay(time);
-    }
-    for (int i = 255; i >= 0; i--) {
-      if (motorA) 
-      {
-        analogWrite(steeringPWMp, i);
-        analogWrite(steeringPWMn, 0);
-      }
-      if (motorB) 
-      {
-        analogWrite(tiltPWMp, i);
-        analogWrite(tiltPWMn, 0);
-      }
-      delay(time);
-    }
+    return MAX_ROTATION + TOLERANCE;
+  } 
+  else if (wheelPosition < MIN_ROTATION - TOLERANCE) 
+  {
+    return MIN_ROTATION - TOLERANCE;
+  } 
+  else 
+  {
+    return wheelPosition;
   }
 }
