@@ -1,3 +1,11 @@
+/**********************************************************/
+//  SteeringModule  --  Board Rev 2
+//  
+//  Hardware: John Anderson     jma2388@iastate.edu
+//
+//  Software: Henry Hayes       hayesh@iastate.edu
+//
+/**********************************************************/
 /*
 12-Pin Deutsch Connector: 
   1: Tilt Motor Positive       12: Tilt Motor Negative
@@ -16,13 +24,18 @@ Encoder Connector:
 Don't worry about the steering sensor input. Not sure what that even does.
 */
 
-////Libraries
+/**********************************************/
+/*                  Libraries                 */
+/**********************************************/
 #include <Encoder.h>
 #include <Math.h>
 #include <SPI.h>
 #include <mcp2515.h>
 
-////Pin Definitions
+/***************************************************/
+/*                  Pin Definitions                */
+/***************************************************/
+
 //MCP2515
 #define INT 2                               //MCP2515 Interrupt
 #define CS 8                                //MCP2515 CS
@@ -52,12 +65,17 @@ Don't worry about the steering sensor input. Not sure what that even does.
 //Other
 #define SensorIn A0                         //Steering Sensor Input (Rack and Pinion Sensor Maybe)
 
-////Variable Definitions
+/**********************************************************/
+/*                  Constant Definitions                  */
+/**********************************************************/
 #define ENCODER_OPTIMIZE_INTERRUPTS
 #define motorTicksPerRotation 435.3 // Encoder ticks per rotation
+
+/**********************************************************/
+/*                  Variable Definitions                  */
+/**********************************************************/
 long oldPosition = 0;
-long wheelPosition;
-long newPosition;
+long newPosition = 0;
 int motorPower;
 double rotation;
 float tolerance = 0.1; //FIND IDEAL VALUE
@@ -71,10 +89,16 @@ uint32_t target = 0x0CF00105;     //SET CAN VALUE
 byte messageOut[8] {0, 0, 0, 0, 0, 0, 0, 0};
 byte messageIn[8] {0, 0, 0, 0, 0, 0, 0, 0};
 
-////Object Definitions
+/********************************************************/
+/*                  Object Definitions                  */
+/********************************************************/
 MCP2515 mcp2515(CS);
 Encoder motorEncoder(encoderB, encoderA);
 
+
+/******************************************/
+/*                  Setup                 */
+/******************************************/
 void setup() {
   Serial.begin(115200);
   mcp2515.reset();
@@ -95,30 +119,49 @@ void setup() {
   pinMode(MUXread, INPUT);
 }
 
-void loop() {
-  //Read Encoder Value: value = motorEncoder.read();
+void loop()
+{
+  //Read Encoder Position
+  new_position = motor1.read();
+
+  //Check if position Changed
+  if (new_position != old_position)
+  {
+    
+  }
+
+  
 }
 
-void motorTest(bool motorA, bool motorB, double time = 10) {
+
+void motorTest(bool motorA, bool motorB, double time = 10) 
+{
   // Test Routine for Testing Motors
-  if (motorA || motorB) {
-    for (int i = 0; i <= 255; i++) {
-      if (motorA) {
+ 
+  if (motorA || motorB) 
+  {
+    for (int i = 0; i <= 255; i++) 
+    {
+      if (motorA) 
+      {
         analogWrite(steeringPWMp, i);
         analogWrite(steeringPWMn, 0);
       }
-      if (motorB) {
+      if (motorB) 
+      {
         analogWrite(tiltPWMp, i);
         analogWrite(tiltPWMn, 0);
       }
       delay(time);
     }
     for (int i = 255; i >= 0; i--) {
-      if (motorA) {
+      if (motorA) 
+      {
         analogWrite(steeringPWMp, i);
         analogWrite(steeringPWMn, 0);
       }
-      if (motorB) {
+      if (motorB) 
+      {
         analogWrite(tiltPWMp, i);
         analogWrite(tiltPWMn, 0);
       }
