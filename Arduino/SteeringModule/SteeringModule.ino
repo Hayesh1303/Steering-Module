@@ -36,7 +36,8 @@ Don't worry about the steering sensor input. Not sure what that even does.
 /*                  Function Declarations                 */          
 /**********************************************************/
 long wheel_bound(long wheelPosition);
-long map_steering (long boundedPosition, bool wheelDirection);
+long map_steering_motor (long boundedPosition, bool wheelDirection);
+long map_steering_output(long boundedPosition);
 
 
 /***************************************************/
@@ -199,7 +200,7 @@ long wheel_bound(long wheelPosition)
 }
 
 //Maps steering wheel position to motor output pwm
-long map_steering (long boundedPosition, bool wheelDirection)
+long map_steering_motor (long boundedPosition, bool wheelDirection)
 {
   long inMin,inMax;
 
@@ -226,8 +227,10 @@ long map_steering (long boundedPosition, bool wheelDirection)
 
   //Maps with adjusted values
   return map(boundedPosition, inMin, inMax, 0, MAX_MOTOR_OUTPUT); 
+}
 
-  
-
-  
+//Maps motor position for Can message
+long map_steering_output(long boundedPosition)
+{
+  return map(boundedPosition, MIN_ROTATION - TOLERANCE, MAX_ROTATION + TOLERANCE, 0, MAX_STEERING_OUTPUT);
 }
