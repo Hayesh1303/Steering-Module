@@ -170,7 +170,36 @@ void loop()
     //Set old position
     oldPosition = newPosition;
     boundedPosition = wheel_bound(newPosition);
-  
+    
+    steeringOut = map_steering_output(boundedPosition);
+    
+    //Serial.print("Out position: ");
+    //Serial.println(steeringOut);
+
+    //Causes resistance if passing Right Bound
+    if(boundedPosition > MAX_ROTATION - TOLERANCE)
+    {
+      motorPower = map_steering_motor(boundedPosition, RIGHT);
+
+      analogWrite(steeringPWMp, motorPower);
+      analogWrite(steeringPWMn, 0);
+    }
+
+    //Causes resistance if passing left bound
+    else if(boundedPosition < MIN_ROTATION + TOLERANCE)
+    {
+      motorPower = map_steering_motor(boundedPosition, LEFT);
+
+      analogWrite(steeringPWMp, 0);
+      analogWrite(steeringPWMn, motorPower);
+    }
+
+    //Resets the motor powers
+    else
+    {
+      analogWrite(steeringPWMp, 0);
+      analogWrite(steeringPWMn, 0);
+    }
   }
 
   
