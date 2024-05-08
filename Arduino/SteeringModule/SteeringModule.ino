@@ -32,6 +32,13 @@ Don't worry about the steering sensor input. Not sure what that even does.
 #include <SPI.h>
 #include <mcp2515.h>
 
+/**********************************************************/
+/*                  Function Declarations                 */          
+/**********************************************************/
+long wheel_bound(long wheelPosition);
+long map_steering (long boundedPosition, bool wheelDirection);
+
+
 /***************************************************/
 /*                  Pin Definitions                */
 /***************************************************/
@@ -44,11 +51,11 @@ Don't worry about the steering sensor input. Not sure what that even does.
 #define MUXa A5                             //Lighting Stick MUX A
 #define MUXb A6                             //Lighting Stick MUX B
 #define MUXc 7                              //Lighting Stick MUX C
-#define MUXread A7;                            //LIghting Stick MUX Read
+#define MUXread A7                            //LIghting Stick MUX Read
 
 //Steering Motor Encoder
-#define EncoderA 3                          //Steering Motor Encoder A
-#define EncoderB 4                          //Steering Motor Encoder B
+#define encoderA 3                          //Steering Motor Encoder A
+#define encoderB 4                          //Steering Motor Encoder B
 
 //Steering Motor
 #define steeringPWMp 5                      //Steering Motor PWM Positive
@@ -63,12 +70,19 @@ Don't worry about the steering sensor input. Not sure what that even does.
 #define currentSenseTiltn A4                //Tilt Motor Current Sense Negative
 
 //Other
-#define SensorIn A0                         //Steering Sensor Input (Rack and Pinion Sensor Maybe)
+#define sensorIn A0                         //Steering Sensor Input (Rack and Pinion Sensor Maybe)
 
 /**********************************************************/
 /*                  Constant Definitions                  */
 /**********************************************************/
+//Direction
+#define LEFT true
+#define RIGHT false
+
+//Encoder
 #define ENCODER_OPTIMIZE_INTERRUPTS
+
+//Steering Rotation
 #define motorTicksPerRotation 435.3 // Encoder ticks per rotation
 #define TOTAL_ROTATION 2            // Rotations from max left to max right
 #define TOTAL_ROTATION_TICKS (435.3 * TOTAL_ROTATION) // Max rotation ticks
@@ -76,12 +90,19 @@ Don't worry about the steering sensor input. Not sure what that even does.
 #define MAX_ROTATION (TOTAL_ROTATION / 2)
 #define TOLERANCE 45
 
+//Steering Position Output
+#define MAX_STEERING_OUTPUT 10000
+#define MIN_STEERING_OUTPUT 0
+
+//Steering Motor Power Output
+#define MAX_MOTOR_OUTPUT 150
+
 /**********************************************************/
 /*                  Variable Definitions                  */
 /**********************************************************/
 //CAN Variables
-struct canFrame frame;
-struct canFrame out;
+struct can_frame frame;
+struct can_frame out;
 uint32_t target = 0x0CF00105;     //SET CAN VALUE
 byte messageOut[8] {0, 0, 0, 0, 0, 0, 0, 0};
 byte messageIn[8] {0, 0, 0, 0, 0, 0, 0, 0};
@@ -89,7 +110,7 @@ byte messageIn[8] {0, 0, 0, 0, 0, 0, 0, 0};
 //Steering Variables
 long oldPosition = 0;
 long newPosition = 0;
-long boundedPositiont = 0;
+long boundedPosition = 0;
 int motorPower;
 double rotation;
 uint16_t steeringOut;
@@ -112,16 +133,16 @@ void setup() {
 
 //CAN Init
   mcp2515.reset();
-  mcp2515.setBitrate(CAN_250KBPS, MCP_12MHZ);
+  mcp2515.setBitrate(CAN_250KBPS, MCP_16MHZ);     /*        <---  FIX THIS         */
   mcp2515.setNormalMode();
-
+  
 //Steering Motor Pin Init
-  pinMode(SteeringPWMp, OUTPUT);
-  pinMode(SteeringPWMn, OUTPUT);
+  pinMode(steeringPWMp, OUTPUT);
+  pinMode(steeringPWMn, OUTPUT);
 
 //Tilt Motor Pin Init
-  pinMode(TiltPWMp, OUTPUT);
-  pinMode(TiltPWMn, OUTPUT);
+  pinMode(tiltPWMp, OUTPUT);
+  pinMode(tiltPWMn, OUTPUT);
 
 //Bullshit
   pinMode(currentSenseSteeringp, INPUT);
@@ -140,7 +161,7 @@ void setup() {
 void loop()
 {
   //Read Encoder Position
-  newPosition = motor1.read();
+  newPosition = motorEncoder.read();
 
   //Check if position Changed
   if (newPosition != oldPosition)
@@ -154,20 +175,59 @@ void loop()
   
 }
 
+
+
+
+/**********************************************/
+/*                  Functions                 */
+/**********************************************/
 //This ensures the steering wheels rotation values stays within the working values of this code
 long wheel_bound(long wheelPosition) 
 {
-  long temp_value;
-  if (wheelPosition > MAX_ROTATION + TOLERANCE) 
+  if (wheelPosition > MAX_ROTATION + TOLERANCE)     //Bounds max position
   {
     return MAX_ROTATION + TOLERANCE;
-  } 
-  else if (wheelPosition < MIN_ROTATION - TOLERANCE) 
+  }
+  else if (wheelPosition < MIN_ROTATION - TOLERANCE)  //Bounds min position
   {
     return MIN_ROTATION - TOLERANCE;
   } 
-  else 
+  else  //Otherwise
   {
     return wheelPosition;
   }
+}
+
+//Maps steering wheel position to motor output pwm
+long map_steering (long boundedPosition, bool wheelDirection)
+{
+  long inMin,inMax;
+
+  //Sets the min and max values
+  if(wheelDirection)
+  {
+    inMin = MIN_ROTATION - TOLERANCE;
+    inMax = MIN_ROTATION + TOLERANCE;
+  }
+  else
+  {
+    inMin = MAX_ROTATION - TOLERANCE;
+    inMax = MAX_ROTATION + TOLERANCE;
+  }
+
+  // Maps steering power to exponential
+  boundedPosition = boundedPosition - inMin;
+  boundedPosition = 5 * abs(boundedPosition) + pow(boundedPosition, 4);
+
+  //Sets new min and max values
+  inMax = (inMax - inMin);
+  inMax = 5 * abs(inMax) + pow(inMax, 4);
+  inMin = 0;
+
+  //Maps with adjusted values
+  return map(boundedPosition, inMin, inMax, 0, MAX_MOTOR_OUTPUT); 
+
+  
+
+  
 }
