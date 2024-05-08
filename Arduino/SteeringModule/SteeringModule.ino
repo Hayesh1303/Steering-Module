@@ -84,9 +84,9 @@ long map_steering_output(long boundedPosition);
 #define ENCODER_OPTIMIZE_INTERRUPTS
 
 //Steering Rotation
-#define motorTicksPerRotation 435.3 // Encoder ticks per rotation
+#define TICK_PER_ROTATION 435.3 // Encoder ticks per rotation
 #define TOTAL_ROTATION 2            // Rotations from max left to max right
-#define TOTAL_ROTATION_TICKS (435.3 * TOTAL_ROTATION) // Max rotation ticks
+#define TOTAL_ROTATION_TICKS (TICK_PER_ROTATION * TOTAL_ROTATION) // Max rotation ticks
 #define MIN_ROTATION (TOTAL_ROTATION / -2)
 #define MAX_ROTATION (TOTAL_ROTATION / 2)
 #define TOLERANCE 45
@@ -98,15 +98,14 @@ long map_steering_output(long boundedPosition);
 //Steering Motor Power Output
 #define MAX_MOTOR_OUTPUT 150
 
+//CAN message IDs
+#define steeringID 0x0CFF0105
 /**********************************************************/
 /*                  Variable Definitions                  */
 /**********************************************************/
 //CAN Variables
-struct can_frame frame;
-struct can_frame out;
-uint32_t target = 0x0CF00105;     //SET CAN VALUE
+struct can_frame steeringMessage;
 byte messageOut[8] {0, 0, 0, 0, 0, 0, 0, 0};
-byte messageIn[8] {0, 0, 0, 0, 0, 0, 0, 0};
 
 //Steering Variables
 long oldPosition = 0;
@@ -115,6 +114,9 @@ long boundedPosition = 0;
 int motorPower;
 double rotation;
 uint16_t steeringOut;
+
+//Use in loops
+int i, j, k;
 
 /********************************************************/
 /*                  Object Definitions                  */
@@ -130,12 +132,16 @@ Encoder motorEncoder(encoderB, encoderA);
 /*                  Setup                 */
 /******************************************/
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
 
 //CAN Init
   mcp2515.reset();
   mcp2515.setBitrate(CAN_250KBPS, MCP_16MHZ);     /*        <---  FIX THIS         */
   mcp2515.setNormalMode();
+
+//CAN Message init
+  steeringMessage.can_id = steeringID;
+  steeringMessage.can_dlc = 8;
   
 //Steering Motor Pin Init
   pinMode(steeringPWMp, OUTPUT);
@@ -175,6 +181,17 @@ void loop()
     
     //Serial.print("Out position: ");
     //Serial.println(steeringOut);
+
+    //Maps Out Position to a CAN Message
+    Serial.print("Can message: ");
+    for(i = 0; i < 2; i++)
+    {
+      steeringMessage.data[i] = (steeringOut >> (8 * i) && 0xFF;
+    }
+
+    //Sends steering output message
+    mcp2515.sendMessage (&steeringOut);
+
 
     //Causes resistance if passing Right Bound
     if(boundedPosition > MAX_ROTATION - TOLERANCE)
